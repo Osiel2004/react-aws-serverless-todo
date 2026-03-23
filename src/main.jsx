@@ -1,10 +1,27 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
+import React from 'react'
+import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import './index.css'
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
+// 1. Importar Amplify y sus estilos visuales
+import { Amplify } from 'aws-amplify';
+import '@aws-amplify/ui-react/styles.css';
+
+// 2. Configurar Amplify con tus IDs exactos de Terraform
+Amplify.configure({
+  Auth: {
+    Cognito: {
+      userPoolId: 'us-east-1_hXTMFRN1G',
+      userPoolClientId: '28iti979mccn1t1dvhnsa18iai',
+    }
+  }
+});
+
+// Guardaremos la URL de tu API globalmente para usarla en el siguiente bloque
+window.API_URL = "https://uoqlghrx24.execute-api.us-east-1.amazonaws.com";
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
     <App />
-  </StrictMode>,
+  </React.StrictMode>,
 )
