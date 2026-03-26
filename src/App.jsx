@@ -3,7 +3,7 @@ import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import { Authenticator } from '@aws-amplify/ui-react';
 import './App.css';
 
-// URL de tu API Gateway en AWS (Ya configurada directamente)
+// URL de tu API Gateway en AWS (Asegúrate de que sea la actual)
 const API = "https://4b7c6d8gl3.execute-api.us-east-1.amazonaws.com";
 
 // --- VISTA PÚBLICA (Solo Lectura) ---
@@ -13,76 +13,50 @@ function VistaPublica() {
   useEffect(() => {
     fetch(`${API}/tareas`)
       .then(res => res.json())
-      .then(data => {
-        // Blindaje: Solo actualizamos si AWS manda una lista real
-        if (Array.isArray(data)) {
-          setTareas(data);
-        } else {
-          console.error("Respuesta inesperada de AWS:", data);
-          setTareas([]); // Evita que .map() explote
-        }
-      })
-      .catch(err => {
-        console.error("Error cargando tareas públicas:", err);
-        setTareas([]);
-      });
+      .then(data => Array.isArray(data) ? setTareas(data) : setTareas([]))
+      .catch(err => console.error("Error cargando tareas públicas:", err));
   }, []);
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
+    <div className="container">
       <h2>🌎 Tareas Públicas</h2>
-      <p><em>Cualquiera puede ver esta lista (Modo solo lectura)</em></p>
-      
-      {tareas.length === 0 ? <p>No hay tareas registradas aún o están cargando...</p> : (
-        <ul style={{ listStyleType: 'none', padding: 0, textAlign: 'left' }}>
-          {tareas.map(t => (
-            <li key={t.id} style={{ padding: '10px', borderBottom: '1px solid #ddd', backgroundColor: '#f9f9f9', marginBottom: '5px', borderRadius: '4px', color: '#333' }}>
+      <ul className="task-list">
+        {tareas.length === 0 ? <p>No hay tareas registradas.</p> : (
+          tareas.map(t => (
+            <li key={t.id} className="task-item public-item">
               📌 {t.texto}
             </li>
-          ))}
-        </ul>
-      )}
+          ))
+        )}
+      </ul>
     </div>
   );
 }
 
-// --- VISTA PRIVADA (CRUD Completo) ---
+// --- VISTA PRIVADA (CRUD COMPLETO: Crear, Leer, Actualizar, Eliminar) ---
 function VistaPrivada({ signOut, user }) {
   const [tareas, setTareas] = useState([]);
-  const [nuevaTarea, setNuevaTarea] = useState('');
+  const [textoTarea, setTextoTarea] = useState('');
+  const [editandoId, setEditandoId] = useState(null); // Estado para saber si estamos editando
 
-  // Función para LEER (GET)
   const cargarTareas = () => {
     fetch(`${API}/tareas`)
       .then(res => res.json())
-      .then(data => {
-        // Blindaje: Solo actualizamos si AWS manda una lista real
-        if (Array.isArray(data)) {
-          setTareas(data);
-        } else {
-          console.error("Respuesta inesperada de AWS:", data);
-          setTareas([]); // Evita que .map() explote
-        }
-      })
-      .catch(err => {
-        console.error("Error de conexión:", err);
-        setTareas([]);
-      });
+      .then(data => Array.isArray(data) ? setTareas(data) : setTareas([]))
+      .catch(err => console.error(err));
   };
 
-  // Se ejecuta al cargar el componente
-  useEffect(() => {
-    cargarTareas();
-  }, []);
+  useEffect(() => { cargarTareas(); }, []);
 
-  // Función para CREAR (POST)
-  const crearTarea = async (e) => {
-    e.preventDefault(); 
-    if (!nuevaTarea.trim()) return; 
+  // Función para GUARDAR (Sirve para Crear y para Editar)
+  const guardarTarea = async (e) => {
+    e.preventDefault();
+    if (!textoTarea.trim()) return;
 
     const tarea = {
-      id: Date.now().toString(), 
-      texto: nuevaTarea
+      // Si estamos editando, mantenemos el ID original; si no, creamos uno nuevo
+      id: editandoId || Date.now().toString(),
+      texto: textoTarea
     };
 
     try {
@@ -91,58 +65,72 @@ function VistaPrivada({ signOut, user }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(tarea)
       });
-      setNuevaTarea(''); 
-      cargarTareas(); 
+      
+      // Limpiamos el formulario y los estados
+      setTextoTarea('');
+      setEditandoId(null);
+      cargarTareas();
     } catch (error) {
-      console.error("Error al crear la tarea:", error);
+      console.error("Error al guardar la tarea:", error);
     }
   };
 
-  // Función para ELIMINAR (DELETE)
+  // Función para preparar la interfaz para editar
+  const iniciarEdicion = (tarea) => {
+    setTextoTarea(tarea.texto);
+    setEditandoId(tarea.id);
+  };
+
+  // Función para cancelar la edición y volver a modo "Nueva Tarea"
+  const cancelarEdicion = () => {
+    setTextoTarea('');
+    setEditandoId(null);
+  };
+
   const eliminarTarea = async (id) => {
     try {
-      await fetch(`${API}/tareas/${id}`, {
-        method: 'DELETE'
-      });
-      cargarTareas(); 
+      await fetch(`${API}/tareas/${id}`, { method: 'DELETE' });
+      cargarTareas();
     } catch (error) {
-      console.error("Error al eliminar la tarea:", error);
+      console.error("Error al eliminar:", error);
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '600px', margin: '0 auto' }}>
-      <h2>🔒 Panel de Control Privado</h2>
-      
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', backgroundColor: '#eef2f5', padding: '10px', borderRadius: '8px' }}>
-        <p style={{ margin: 0, color: 'black' }}>Hola, <strong>{user?.signInDetails?.loginId}</strong></p>
-        <button onClick={signOut} style={{ backgroundColor: '#ff4d4f', color: 'white', padding: '8px 15px', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-          Cerrar Sesión
-        </button>
+    <div className="container">
+      <div className="admin-header">
+        <p>Hola, <strong>{user?.signInDetails?.loginId}</strong></p>
+        <button className="btn-signout" onClick={signOut}>Cerrar Sesión</button>
       </div>
 
-      {/* Formulario para agregar tareas */}
-      <form onSubmit={crearTarea} style={{ marginBottom: '20px', display: 'flex', gap: '10px' }}>
+      <h2>{editandoId ? '✏️ Editando Tarea' : '➕ Nueva Tarea'}</h2>
+
+      <form onSubmit={guardarTarea} className="task-form">
         <input 
           type="text" 
-          placeholder="Escribe una nueva tarea..." 
-          value={nuevaTarea}
-          onChange={(e) => setNuevaTarea(e.target.value)}
-          style={{ flex: 1, padding: '10px', borderRadius: '5px', border: '1px solid #ccc', color: 'black' }}
+          placeholder="Escribe algo..." 
+          value={textoTarea}
+          onChange={(e) => setTextoTarea(e.target.value)}
+          className="task-input"
         />
-        <button type="submit" style={{ padding: '10px 20px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>
-          Agregar
+        <button type="submit" className={editandoId ? "btn-update" : "btn-add"}>
+          {editandoId ? 'Actualizar' : 'Agregar'}
         </button>
+        {editandoId && (
+          <button type="button" onClick={cancelarEdicion} className="btn-cancel">
+            Cancelar
+          </button>
+        )}
       </form>
 
-      {/* Lista de tareas */}
-      <ul style={{ listStyleType: 'none', padding: 0, textAlign: 'left' }}>
+      <ul className="task-list">
         {tareas.map(t => (
-          <li key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', borderBottom: '1px solid #ddd', backgroundColor: 'white', color: 'black', marginBottom: '5px', borderRadius: '4px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          <li key={t.id} className="task-item">
             <span>{t.texto}</span>
-            <button onClick={() => eliminarTarea(t.id)} style={{ backgroundColor: '#ff4d4f', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', padding: '5px 10px', fontWeight: 'bold' }}>
-              X
-            </button>
+            <div className="actions">
+              <button className="btn-edit" onClick={() => iniciarEdicion(t)}>✏️</button>
+              <button className="btn-delete" onClick={() => eliminarTarea(t.id)}>X</button>
+            </div>
           </li>
         ))}
       </ul>
@@ -155,11 +143,11 @@ function App() {
   return (
     <BrowserRouter>
       <div className="App">
-        <header>
-          <h1>Gestor de Tareas de Osiel - AWS</h1>
-          <nav style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '30px', padding: '15px', backgroundColor: '#242424', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
-            <Link to="/" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold', fontSize: '1.1rem' }}>🌎 Ver Públicas</Link>
-            <Link to="/admin" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold', fontSize: '1.1rem' }}>🔒 Ir al Admin</Link>
+        <header className="main-header">
+          <h1>Todo Serverless Pro</h1>
+          <nav className="nav-bar">
+            <Link to="/">Público</Link>
+            <Link to="/admin">Admin</Link>
           </nav>
         </header>
 

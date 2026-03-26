@@ -6,7 +6,6 @@ const dynamo = DynamoDBDocumentClient.from(client);
 const tableName = process.env.TABLE_NAME;
 
 export const handler = async (event) => {
-  // 1. Cabeceras de seguridad (CORS) obligatorias para React
   const headers = { 
     "Content-Type": "application/json",
     "Access-Control-Allow-Origin": "*",
@@ -15,42 +14,65 @@ export const handler = async (event) => {
   };
 
   try {
-    // 2. Extracción "A prueba de balas" del método y la ruta
-    const method = event.httpMethod || (event.requestContext && event.requestContext.http && event.requestContext.http.method) || "GET";
+    const method = event.httpMethod || (event.requestContext?.http?.method) || "GET";
     const path = event.path || event.rawPath || "/";
 
-    // 3. El navegador SIEMPRE hace una petición OPTIONS primero por seguridad.
-    // Le decimos que todo está bien y que puede continuar.
+    // 1. Manejo de Preflight (CORS)
     if (method === "OPTIONS") {
       return { statusCode: 200, headers, body: JSON.stringify({ message: "CORS OK" }) };
     }
 
-    // 4. Lógica de Negocio (CRUD)
-    // Usamos ".includes()" en lugar de "===" por si AWS le agrega barras inclinadas extras al final
+    // 2. LEER TAREAS (GET)
     if (method === "GET" && path.includes("/tareas")) {
       const result = await dynamo.send(new ScanCommand({ TableName: tableName }));
       return { statusCode: 200, headers, body: JSON.stringify(result.Items || []) };
       
-    } else if (method === "POST" && path.includes("/tareas")) {
-      // Si la petición es válida, parseamos la tarea
+    } 
+    
+    // 3. CREAR O EDITAR TAREA (POST)
+    // PutCommand en DynamoDB crea el item si el ID no existe, o lo reemplaza si ya existe.
+    else if (method === "POST" && path.includes("/tareas")) {
       const requestJSON = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
-      await dynamo.send(new PutCommand({ TableName: tableName, Item: requestJSON }));
-      return { statusCode: 200, headers, body: JSON.stringify({ message: "Tarea guardada", id: requestJSON.id }) };
       
-    } else if (method === "DELETE" && path.includes("/tareas/")) {
-      // Extraemos el ID dinámicamente, sin importar la posición en la URL
+      if (!requestJSON.id || !requestJSON.texto) {
+        throw new Error("Faltan campos obligatorios: id o texto");
+      }
+
+      await dynamo.send(new PutCommand({ 
+        TableName: tableName, 
+        Item: {
+          id: requestJSON.id,
+          texto: requestJSON.texto
+        }
+      }));
+      
+      return { 
+        statusCode: 200, 
+        headers, 
+        body: JSON.stringify({ message: "Operación exitosa", id: requestJSON.id }) 
+      };
+      
+    } 
+    
+    // 4. ELIMINAR TAREA (DELETE)
+    else if (method === "DELETE" && path.includes("/tareas/")) {
       const partes = path.split('/');
       const id = partes[partes.length - 1]; 
       await dynamo.send(new DeleteCommand({ TableName: tableName, Key: { id: id } }));
       return { statusCode: 200, headers, body: JSON.stringify({ message: "Tarea eliminada" }) };
       
-    } else {
-      // Si llega aquí, de verdad es una ruta desconocida
-      return { statusCode: 404, headers, body: JSON.stringify({ error: `Ruta no soportada en la Lambda: ${method} ${path}` }) };
+    } 
+    
+    else {
+      return { statusCode: 404, headers, body: JSON.stringify({ error: "Ruta no encontrada" }) };
     }
 
   } catch (err) {
-    // Captura de errores de la base de datos
-    return { statusCode: 500, headers, body: JSON.stringify({ error: "Error interno del servidor", detalle: err.message }) };
+    console.error(err);
+    return { 
+      statusCode: 500, 
+      headers, 
+      body: JSON.stringify({ error: "Error en el servidor", detalle: err.message }) 
+    };
   }
 };
