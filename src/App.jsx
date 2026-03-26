@@ -172,4 +172,4 @@ function App() {
 }
 
 export default App;
-// v2.1 correccion id.
+// v2.2 correccion id.
