@@ -4,7 +4,7 @@ import { Authenticator } from '@aws-amplify/ui-react';
 import './App.css';
 
 // URL de tu API Gateway en AWS (Ya configurada directamente)
-const API = "https://uoqlghrx24.execute-api.us-east-1.amazonaws.com";
+const API = "https://4b7c6d8gl3.execute-api.us-east-1.amazonaws.com";
 
 // --- VISTA PÚBLICA (Solo Lectura) ---
 function VistaPublica() {
@@ -156,7 +156,7 @@ function App() {
     <BrowserRouter>
       <div className="App">
         <header>
-          <h1>Gestor de Tareas Serverless</h1>
+          <h1>Gestor de Tareas de Osiel - AWS</h1>
           <nav style={{ display: 'flex', gap: '20px', justifyContent: 'center', marginBottom: '30px', padding: '15px', backgroundColor: '#242424', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.3)' }}>
             <Link to="/" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold', fontSize: '1.1rem' }}>🌎 Ver Públicas</Link>
             <Link to="/admin" style={{ color: 'white', textDecoration: 'none', fontWeight: 'bold', fontSize: '1.1rem' }}>🔒 Ir al Admin</Link>
